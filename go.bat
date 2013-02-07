@@ -1,0 +1,1 @@
+coffee -c game.coffee && one.html
