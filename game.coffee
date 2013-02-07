@@ -1,6 +1,8 @@
 unit = 20
 field_x = 10
 field_y = 20
+border_width = 3
+border_2width = border_width * 2
 
 # colors
 bg_color = '#EEEEEE'
@@ -9,6 +11,9 @@ bg_color = '#EEEEEE'
 brick_body_color =   ['#33CCFF', '#00FF00', '#FF0000', '#FF9933', '#FF66FF', '#FFFF00', '#0000CC']
 brick_border_color = ['#0099CC', '#33CC33', '#CC0000', '#CC6600', '#CC33FF', '#FFFF66', '#000066']
 
+highlight_body_color = '#FFFFFF'
+highlight_border_color = "#000000"
+
 arrow = {left: 37, up: 38, right: 39, down: 40}
 
 class Tetris
@@ -16,12 +21,15 @@ class Tetris
 		@canv = $('#canv')[0]
 		@ctx = @canv.getContext('2d')
 
+	clearField: () ->
+		@ctx.fillStyle = bg_color
+		@ctx.fillRect(0, 0, @canv.width, @canv.height)
+
 	init: () ->
 		@canv.width = field_x * unit
 		@canv.height = field_y * unit
 
-		@ctx.fillStyle = bg_color
-		@ctx.fillRect(0, 0, @canv.width, @canv.height)
+		this.clearField()		
 
 		document.onkeydown = this.keyDownHandler
 
@@ -32,7 +40,7 @@ class Tetris
 		@ctx.fillRect(lf, tp, unit, unit)
 
 		@ctx.fillStyle = brick_body_color[color]
-		@ctx.fillRect(lf + 3, tp + 3, unit - 6, unit - 6)
+		@ctx.fillRect(lf + border_width, tp + border_width, unit - border_2width, unit - border_2width)
 
 	eraseBrick: (x, y) ->
 		lf = x * unit
@@ -62,6 +70,16 @@ class Tetris
 		bad = (brick for brick in figure.points when !this.brickIsValid(brick.x + x, brick.y + y))
 		return bad.length == 0
 
+	rotateFigureBricks: (bricks) ->
+		rotated = for brick in bricks
+			{ x: brick.y, y: -brick.x, color_id: brick.color_id }
+		base = rotated.reduce (acc, brick) ->
+			if brick.y > acc.y || (brick.y == acc.y && brick.x < acc.x)
+				acc = brick
+			acc
+		for brick in rotated
+			{ x: brick.x - base.x, y: brick.y - base.y, color_id: brick.color_id }
+
 	moveFigure: (dx, dy) ->
 		if !this.figureIsValid(@figure, dx, dy)
 			return null
@@ -71,10 +89,21 @@ class Tetris
 		this.drawFigure @figure
 		@figure
 
+	rotateFigure: () ->
+		rotated = { x: @figure.x, y: @figure.y, points: this.rotateFigureBricks(@figure.points) }
+		if !this.figureIsValid(rotated, 0, 0)
+			return null
+		this.eraseFigure @figure
+		@figure = rotated
+		this.drawFigure @figure
+		@figure
+
 	keyDownHandler: (evt) ->
 		switch evt.keyCode
 			when arrow.left
 				window.game.moveFigure(-1, 0)
+			when arrow.up
+				window.game.rotateFigure()
 			when arrow.right
 				window.game.moveFigure(1, 0)
 			when arrow.down
@@ -94,12 +123,40 @@ class Tetris
 			{x: point[0], y: point[1], color_id: color}
 		{x: xoffset, y: yoffset, points: pts}
 
+	highlightRow: (row) ->
+		tp = row * unit
+		width = unit * field_x
+		@ctx.fillStyle = highlight_border_color
+		@ctx.fillRect(0, tp, width, unit)
+
+		@ctx.fillStyle = highlight_body_color
+		@ctx.fillRect(border_width, tp + border_width, width - border_2width, unit - border_2width)
+
+	checkBricks: () ->
+		counts = (0 for i in [0..(field_y - 1)])
+		shifts = (0 for i in [0..(field_y - 1)])
+		for brick in @bricks
+			counts[brick.y] += 1
+		rows_decrement = 0
+		for i in [(field_y - 1)..0]
+			if counts[i] >= field_x
+				this.highlightRow(i)
+				rows_decrement += 1
+			shifts[i] = rows_decrement
+		if rows_decrement > 0
+			this.clearField()
+			@bricks = ({ x: brick.x, y: brick.y + shifts[brick.y], color_id: brick.color_id } for brick in @bricks when counts[brick.y] < field_x)
+			for brick in @bricks
+				this.drawBrick(brick.x, brick.y, brick.color_id)
+		null
+
 	nextFigure: () ->
 		fx = @figure.x
 		fy = @figure.y
 		figure_bricks = for brick in @figure.points
 							{x: brick.x + fx, y: brick.y + fy, color_id: brick.color_id}
 		@bricks = @bricks.concat(figure_bricks)
+		this.checkBricks()
 		@figure = this.makeFigureT(5, 0, 1)
 		if this.figureIsValid(@figure, 0, 0)
 			this.drawFigure(@figure)
