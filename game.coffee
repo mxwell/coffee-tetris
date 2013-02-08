@@ -16,6 +16,16 @@ highlight_border_color = "#000000"
 
 arrow = {left: 37, up: 38, right: 39, down: 40}
 
+figures = [
+	[ [0, 0], [1, 0],  [1, -1], [2, 0]  ],
+	[ [0, 0], [0, -1], [1, 0],  [2, 0]  ],
+	[ [0, 0], [1, 0],  [2, 0],  [2, -1] ],
+	[ [0, 0], [1, 0],  [1, -1], [2, -1] ],
+	[ [0, -1], [1, 0], [1, -1], [2, 0] ],
+	[ [0, 0], [1, 0],  [2, 0],  [3, 0]  ],
+	[ [0, 0], [1, 0],  [0, -1], [1, -1] ],
+]
+
 class Tetris
 	constructor: () ->
 		@canv = $('#canv')[0]
@@ -110,18 +120,25 @@ class Tetris
 				window.game.moveFigure(0, 1)
 		null
 
-	makeFigureT: (xoffset, yoffset, color, orientation = 0) ->
-		if orientation == 0
-			points = [ [0, 0], [1, 0], [2, 0], [1, 1] ]
-		else if orientation == 1
-			points = [ [0, 0], [0, 1], [0, 2], [1, 1] ]
-		else if orientation == 2
-			points = [ [0, 1], [1, 0], [1, 1], [2, 1] ]
-		else
-			points = [ [0, 1], [1, 0], [1, 1], [1, 2] ]
+	getRandom: (upper_bound) ->
+		Math.floor(Math.random() * upper_bound)
+
+	rotate: (points, times) ->
+		for it in [1..times]
+			points = ([point[1], -point[0]] for point in points)
+		points
+
+	makeFigure: () ->
+		color = this.getRandom brick_body_color.length
+		figure = this.getRandom figures.length
+		rotations = this.getRandom 3
+		points = this.rotate figures[figure], rotations
+		height = 0
 		pts = for point in points
+			if height < -point[1]
+				height = -point[1]
 			{x: point[0], y: point[1], color_id: color}
-		{x: xoffset, y: yoffset, points: pts}
+		{x: 4, y: height + 1, points: pts}
 
 	highlightRow: (row) ->
 		tp = row * unit
@@ -157,7 +174,7 @@ class Tetris
 							{x: brick.x + fx, y: brick.y + fy, color_id: brick.color_id}
 		@bricks = @bricks.concat(figure_bricks)
 		this.checkBricks()
-		@figure = this.makeFigureT(5, 0, 1)
+		@figure = this.makeFigure()
 		if this.figureIsValid(@figure, 0, 0)
 			this.drawFigure(@figure)
 		else
@@ -173,7 +190,7 @@ class Tetris
 
 	run: () ->
 		@bricks = []
-		@figure = this.makeFigureT(5, 5, 1)
+		@figure = this.makeFigure()
 		this.drawFigure(@figure)
 		window.timerVar = window.setInterval(this.timerHandler, 500)
 
